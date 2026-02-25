@@ -32,20 +32,30 @@ def render_candlestick(df: pd.DataFrame, title: str = "K线图"):
 
     # 2. MA Lines
     # Standard MAs: 5, 10, 20, 30, 60, 120, 250
-    ma_periods = [5, 10, 20, 30, 60, 120, 250]
-    # Use a color palette or let Plotly auto-assign colors
-    # To keep it clean, maybe we only show a few by default or make them toggleable in legend
-    for ma in ma_periods:
-        ma_col = f"ma{ma}"
-        if len(df) >= ma:
-            df[ma_col] = df["close"].rolling(window=ma).mean()
+    ma_config = [
+        {"period": 5, "color": "#1f77b4"},   # Blue
+        {"period": 10, "color": "#ff7f0e"},  # Orange
+        {"period": 20, "color": "#2ca02c"},  # Green
+        {"period": 30, "color": "#d62728"},  # Red
+        {"period": 60, "color": "#9467bd"},  # Purple
+        {"period": 120, "color": "#8c564b"}, # Brown
+        {"period": 250, "color": "#e377c2"}, # Pink
+    ]
+    
+    for ma in ma_config:
+        period = ma["period"]
+        color = ma["color"]
+        ma_col = f"ma{period}"
+        
+        if len(df) >= period:
+            df[ma_col] = df["close"].rolling(window=period).mean()
             fig.add_trace(
                 go.Scatter(
                     x=df["date_str"],
                     y=df[ma_col],
                     mode="lines",
-                    name=f"MA{ma}",
-                    line=dict(width=1),  # Thin lines to avoid clutter
+                    name=f"MA{period}",
+                    line=dict(width=1, color=color),  # Thin lines with specific color
                 ),
                 row=1,
                 col=1,
