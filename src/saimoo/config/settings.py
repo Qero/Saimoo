@@ -1,14 +1,27 @@
-from pydantic import Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
-    SAIMOO_ENV: str = "development"
-    DB_URL: str = "sqlite:///./saimoo.db"
-    TUSHARE_TOKEN: str = ""
-    LOG_LEVEL: str = "INFO"
+    """应用配置"""
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = 'utf-8'
+    # Database
+    DB_PATH: str = "saimoo.db"
+
+    @property
+    def DB_URL(self) -> str:
+        """Construct database URL from path"""
+        return f"sqlite:///{self.DB_PATH}"
+
+    # Data Sources
+    TUSHARE_TOKEN: str = ""
+    RQDATA_USER: str = ""
+    RQDATA_PASSWORD: str = ""
+
+    # Backtest
+    DEFAULT_CAPITAL: float = 100000.0
+    DEFAULT_COMMISSION: float = 0.0003
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
 
 settings = Settings()
