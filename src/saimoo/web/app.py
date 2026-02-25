@@ -61,7 +61,7 @@ def main():
     # Date Range
     # start_date and end_date removed as per user request
     # We load all available local data
-    
+
     # Adjust Type
     adjust_map = {"不复权": AdjustType.NONE, "前复权": AdjustType.QFQ, "后复权": AdjustType.HFQ}
     adjust_label = st.sidebar.selectbox("复权类型", list(adjust_map.keys()), index=1)
@@ -103,15 +103,44 @@ def main():
         st.info("提示: 本地数据库可能无数据，请尝试点击侧边栏的「同步数据」。")
         return
 
+    # --- Verification Status ---
+    verify_result = service.get_verification_status(symbol, adjust)
+    if verify_result:
+        v_status = verify_result["status"]
+        v_date = verify_result["date"]
+        v_details = verify_result.get("details")
+
+        if v_status == "fail":
+            st.error(f"⚠️ 双数据源 AK<->TU 数据校验未通过 (最后校验日期: {v_date})")
+            with st.expander("查看差异详情"):
+                st.text(v_details)
+        elif v_status == "pass":
+            st.success(f"✅ 双数据源 AK<->TU 数据校验通过 (最后校验日期: {v_date})")
+    else:
+        if not service.tushare_provider:
+            st.info("ℹ️ 未配置 Tushare Token，无法进行数据双重校验。")
+
     # 1. Header Metrics
     latest = df.iloc[-1]
     prev = df.iloc[-2] if len(df) > 1 else latest
 
     # Check if latest bar is today (incomplete day)
-    # If so, show amount/turnover from previous day
     is_today = latest["date"].date() == date.today()
-    metrics_source = prev if is_today and len(df) > 1 else latest
-    metrics_date_label = f" ({metrics_source['date'].date()})" if is_today else ""
+
+    # If so, show amount/turnover from previous day IF today's data is missing or obviously incomplete
+    # Actually user requested to show today's if available.
+    # But usually real-time amount/turnover is not fully accurate until close.
+    # However, if we have it, we should show it.
+    # Let's check if 'amount' and 'turnover' are valid for latest record
+    latest_valid = pd.notnull(latest["amount"]) and pd.notnull(latest["turnover"]) and latest["amount"] > 0
+
+    if latest_valid:
+        metrics_source = latest
+        metrics_date_label = f" ({latest['date'].date()})" if is_today else ""
+    else:
+        # Fallback to previous day if today's data is missing metrics
+        metrics_source = prev if is_today and len(df) > 1 else latest
+        metrics_date_label = f" ({metrics_source['date'].date()})" if is_today else ""
 
     change = latest["close"] - prev["close"]
     pct = (change / prev["close"]) * 100
@@ -120,6 +149,9 @@ def main():
     col1.metric("最新收盘", f"{latest['close']:.2f}", f"{change:.2f} ({pct:.2f}%)")
     col2.metric("成交量 (手)", f"{latest['volume'] / 100:.0f}")
     col3.metric(f"成交额 (万){metrics_date_label}", f"{metrics_source['amount'] / 10000:.2f}")
+    # Turnover in data is usually percent value (e.g. 1.23), so just format it.
+    # If it was ratio (0.0123), we would need * 100. Let's assume it's percent based on common APIs.
+    # AkShare(Sina) usually returns percent.
     col4.metric(
         f"换手率{metrics_date_label}",
         f"{metrics_source['turnover']:.3f}%" if pd.notnull(metrics_source["turnover"]) else "N/A",
